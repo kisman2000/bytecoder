@@ -23,6 +23,8 @@ import kotlin.io.path.writeText
 private val JAVA_CODE = ImString(1000)
 private val BYTE_CODE = ImString(10000)
 
+private var DIALOG : Dialog? = null
+
 fun main() {
     fun sumFlags(
         flags : Array<Int>
@@ -52,7 +54,6 @@ fun main() {
     fun opcodeName(
         opcode : Int
     ) : String? {
-
         val fields = Opcodes::class.java.declaredFields
 
         for(field in fields) {
@@ -63,6 +64,8 @@ fun main() {
 
         return null
     }
+
+    fun String.descriptor() = "L${this.removePrefix("L").removeSuffix(";")};"
 
     fun generatePhantoms() : Collection<Phantom> {
         val phantoms = hashSetOf<Phantom>()
@@ -222,6 +225,7 @@ fun main() {
                     for((j, call) in calls.toMutableList().also { it.removeFirst() }.withIndex()) {
                         val name : String
                         val type : Types
+                        val descriptor : String
                         val typeClass : String
                         val valueType = if(j == calls.size - 2 && i == subexpressions.size - 1) requiredRootType else null
 
@@ -241,11 +245,11 @@ fun main() {
                                 params.add(subexpression1.valueType!!)
                             }
 
-                            phantoms.add(Phantom(call.replace(regex, "").replace("(", "").replace(")", "").replace(",", ""), Types.Method, owner, "(${params.joinToString("")})${valueType ?: "LReturnTypeClass$returnTypeCounter;"}", shouldBeStatic))
+                            typeClass = valueType ?: "LReturnTypeClass$returnTypeCounter;"
 
-                            name = call.replace(Regex("(SUBEXPRESSION[0-9]+)"), "")
+                            name = call.replace(regex, "").replace("(", "").replace(")", "").replace(",", "")
                             type = Types.Method
-                            typeClass = "LReturnTypeClass$returnTypeCounter;"
+                            descriptor = "(${params.joinToString("")})$typeClass"
                         } else {
                             if(fields.contains(owner)) {
                                 val mappings = fields[owner]!!
@@ -260,8 +264,6 @@ fun main() {
                                     } else {
                                         typeClass = valueType
                                     }
-
-                                    phantoms.add(Phantom(call, Types.Field, "L$owner;", typeClass, shouldBeStatic))
                                 }
                             } else {
                                 if(valueType == null) {
@@ -271,10 +273,14 @@ fun main() {
                                 } else {
                                     typeClass = valueType
                                 }
-
-                                phantoms.add(Phantom(call, Types.Field, "L$owner;", typeClass, shouldBeStatic))
                             }
+
+                            name = call
+                            type = Types.Field
+                            descriptor = typeClass
                         }
+
+                        phantoms.add(Phantom(name, type, owner!!.descriptor(), descriptor, shouldBeStatic))
 
                         if(!createdTypeClasses.contains(typeClass) && typeClass != valueType) {
                             phantoms.add(Phantom(typeClass.removePrefix("L").removeSuffix(";"), Types.Class))
@@ -487,20 +493,28 @@ fun main() {
     fun compileJavaFile(
         code : File,
         library : File
-    ) : File {
+    ) : File? {
         val command = "javac -cp ${library.absolutePath} -d /tmp/bytecoder/classes/ ${code.absolutePath} -Xdiags:verbose"
         val process = Runtime.getRuntime().exec(command)
 
         while(process.isAlive) { }
 
-        println(process.errorStream.readBytes().toString(Charset.defaultCharset()))
+        val errorMessage = process.errorStream.readBytes().toString(Charset.defaultCharset())
 
-        return File("/tmp/bytecoder/classes/${code.name.replace(".java", ".class")}")
+        return if(errorMessage.isNotBlank()) {
+            DIALOG = Dialog("Compilation error", "Error while executing javac", errorMessage)
+
+            null
+        } else {
+            File("/tmp/bytecoder/classes/${code.name.replace(".java", ".class")}")
+        }
     }
 
     fun generateInstructions(
-        clazz : File
-    ) : String {
+        clazz : File?
+    ) = if(clazz == null) {
+        null
+    } else {
         val classNode = read(clazz.readBytes())
         var instructions = ""
 
@@ -512,7 +526,7 @@ fun main() {
             }
         }
 
-        return instructions
+        instructions
     }
 
     fun javacode2bytecode() {
@@ -522,7 +536,9 @@ fun main() {
         val clazz = compileJavaFile(code, library)
         val instructions = generateInstructions(clazz)
 
-        BYTE_CODE.set(instructions)
+        if(instructions != null) {
+            BYTE_CODE.set(instructions)
+        }
 
         //TODO: rewrite it
         println(library.absoluteFile)
@@ -586,6 +602,26 @@ fun main() {
                 javacode2bytecode()
             }
 
+            if(DIALOG != null) {
+                ImGui.openPopup(DIALOG!!.id)
+
+                if(ImGui.beginPopupModal(DIALOG!!.id, ImGuiWindowFlags.AlwaysAutoResize or ImGuiWindowFlags.NoCollapse)) {
+                    //sameline
+
+                    ImGui.text(DIALOG!!.title)
+                    ImGui.separator()
+                    ImGui.inputTextMultiline("## Dialog message", ImString(DIALOG!!.message), 300f, 120f, ImGuiInputTextFlags.ReadOnly)
+
+                    if(ImGui.button("I dont care")) {
+                        ImGui.closeCurrentPopup()
+
+                        DIALOG = null
+                    }
+
+                    ImGui.endPopup()
+                }
+            }
+
 //            ImGui.button("Convert to java objectweb2 code")
 
             ImGui.end()
@@ -635,3 +671,9 @@ enum class Types {
     Field,
     Method
 }
+
+class Dialog(
+    val id : String,
+    val title : String,
+    val message : String
+)
