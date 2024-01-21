@@ -232,9 +232,9 @@ fun main() {
                         }
                     }
 
-                    if(substring.contains(",")) {
-                        val substring2 = if(substring.contains("(")) substring.substring(substring.indexOf("(") + 1, substring.indexOf(")")) else substring
-                        val split = substring2.split(",")
+                    if(substring.contains("(")) {
+                        val substring2 = substring.substring(substring.indexOf("(") + 1, substring.indexOf(")"))
+                        val split = if(substring.contains(",")) substring2.split(",") else listOf(substring2)
                         var substring3 = substring
 
                         for(subexpression in split) {
