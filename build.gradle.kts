@@ -14,7 +14,6 @@ dependencies {
     testImplementation(kotlin("test"))
 
     implementation("io.github.spair:imgui-java-app:1.86.11")
-    implementation("org.clyze:jphantom:1.3")
     implementation("org.ow2.asm:asm:9.6")
     implementation("org.ow2.asm:asm-analysis:9.6")
     implementation("org.ow2.asm:asm-commons:9.6")
