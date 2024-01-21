@@ -11,8 +11,11 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
+import org.objectweb.asm.tree.AbstractInsnNode
 import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.LabelNode
 import java.io.File
+import java.lang.reflect.Modifier
 import java.nio.charset.Charset
 import java.util.Stack
 import java.util.jar.JarEntry
@@ -24,6 +27,15 @@ private val JAVA_CODE = ImString(1000)
 private val BYTE_CODE = ImString(10000)
 
 private var DIALOG : Dialog? = null
+
+val EXCLUDED_INSN_FIELDS = hashSetOf(
+    "opcode",
+    "visibleTypeAnnotations",
+    "invisibleTypeAnnotations",
+    "previousInsn",
+    "nextInsn",
+    "index"
+)
 
 fun main() {
     fun sumFlags(
@@ -52,18 +64,56 @@ fun main() {
     }
 
     fun opcodeName(
-        opcode : Int
+        instruction : AbstractInsnNode
     ) : String? {
-        val fields = Opcodes::class.java.declaredFields
+        if(instruction !is LabelNode) {
+            val fields = Opcodes::class.java.declaredFields
+
+            for(field in fields) {
+                if(field[null] == instruction.opcode) {
+                    return field.name
+                }
+            }
+
+            return null
+        } else {
+//            val valueField = LabelNode::class.java.getDeclaredField("value");
+
+//            valueField.isAccessible = true
+
+//            val valueValue = valueField[instruction]
+
+//            return "$valueValue:"
+            return "LabelNode"
+        }
+    }
+    fun opcodeValues(
+        instruction : AbstractInsnNode
+    ) : String {
+        val fields = instruction.javaClass.declaredFields//T::class.java.declaredFields
+        var values = ""
+        var labelNode = ""
+
+//        println(instruction.javaClass.simpleName)
 
         for(field in fields) {
-            if(field[null] == opcode) {
-                return field.name
+            if(field.modifiers and Modifier.STATIC == 0 && !EXCLUDED_INSN_FIELDS.contains(field.name)) {
+                if(field.type == LabelNode::class.java) {
+//                    labelNode = "\n${opcodeName(instruction)}"
+                    values += " LabelNode()"
+                } else {
+                    field.isAccessible = true
+
+//                    println(field.name)
+
+                    values += " ${field[instruction]}"
+                }
             }
         }
 
-        return null
+        return values
     }
+
 
     fun String.descriptor() = "L${this.removePrefix("L").removeSuffix(";")};"
 
@@ -141,7 +191,7 @@ fun main() {
                 for((index, entry) in brackets.entries.withIndex()) {
                     val start = entry.key + 1
                     val end = entry.value
-                    var substring = expression.substring(start, end)
+                    val substring = expression.substring(start, end)
 
                     fun parseSubexpression(
                         subexpression0 : String
@@ -521,15 +571,17 @@ fun main() {
         for(methodNode in classNode.methods) {
             if(methodNode.name == "main") {
                 for(instruction in methodNode.instructions) {
-                    instructions += "${opcodeName(instruction.opcode)}\n"
+                    instructions += "${opcodeName(instruction)}${opcodeValues(instruction)}\n"
                 }
             }
         }
 
-        instructions
+        instructions.replace(Regex("bytecodertempcodetocompl[0-9]+"), "ThisClass")
     }
 
     fun javacode2bytecode() {
+        BYTE_CODE.set("")
+
         val phantoms = generatePhantoms()
         val library = buildLibrary(phantoms)
         val code = buildJavaFile(phantoms)
@@ -600,6 +652,12 @@ fun main() {
 
             if(ImGui.button("Convert to byte code")) {
                 javacode2bytecode()
+            }
+
+            ImGui.sameLine()
+
+            if(ImGui.button("Clear")) {
+                BYTE_CODE.set("")
             }
 
             if(DIALOG != null) {
