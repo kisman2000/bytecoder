@@ -95,8 +95,6 @@ fun main() {
 
                 for((index, char) in expression.toCharArray().withIndex()) {
                     if(char == '"') {
-                        println(char)
-
                         if(beginQuote == -1) {
                             beginQuote = index
                         } else {
@@ -120,16 +118,16 @@ fun main() {
                     expression = expression.replace(toReplace, replacement)
                 }
 
-                val circleBracketStack = Stack<Int>()
+                val roundBracketStack = Stack<Int>()
                 val squareBracketStack = Stack<Int>()
                 val brackets = mutableMapOf<Int, Int>()
 
                 for((index, char) in expression.toCharArray().withIndex()) {
                     when(char) {
-                        '(' -> circleBracketStack.add(index)
-                        ')' -> brackets[circleBracketStack.pop()] = index
-//                        '[' -> squareBracketStack.add(index)
-//                        ']' -> brackets[squareBracketStack.pop()] = index
+                        '(' -> roundBracketStack.add(index)
+                        ')' -> brackets[roundBracketStack.pop()] = index
+                        '[' -> squareBracketStack.add(index)
+                        ']' -> brackets[squareBracketStack.pop()] = index
                     }
                 }
 
@@ -164,12 +162,6 @@ fun main() {
                             cachedExpressions[subexpression]!!
                         } else {
                             subexpressionCounter++
-                            if(subexpressionCounter == 4) {
-                                println(">>> $subexpression")
-                            }
-                            if(subexpressionCounter == 3) {
-                                println(">>>> $subexpression")
-                            }
                             if(index > 0) {
                                 val prev = subexpressions.entries.last().value
                                 val string = prev.expressionString
@@ -185,27 +177,6 @@ fun main() {
 
                             expression1
                         }
-
-                        /*subexpressionCounter++
-                        if(index > 0) {
-                            val prev = subexpressions.entries.last().value
-                            val string = prev.expressionString
-                            val name = prev.name
-
-                            subexpression = subexpression.replace(string, name)
-                        }
-
-                        val valueType = if(subexpression0.startsWith("STRING")) {
-                            "Ljava/lang/String;"
-                        } else {
-                            null
-                        }
-
-                        val expression1 = Expression(subexpression, "SUBEXPRESSION$subexpressionCounter", valueType)
-
-                        subexpressions["SUBEXPRESSION$subexpressionCounter"] = expression1
-
-                        return expression1*/
                     }
 
                     if(substring.contains(",")) {
@@ -213,22 +184,16 @@ fun main() {
                         val split = substring2.split(",")
                         var substring3 = substring
 
-
                         for(subexpression in split) {
                             val parsedExpression = parseSubexpression(subexpression)
 
-                            println("> parsing $subexpression ${parsedExpression.expressionString} ${parsedExpression.name}")
-
                             substring3 = substring3.replace(parsedExpression.expressionString, parsedExpression.name)
                         }
-                        if(substring.contains("(")) {
-                            println(">> parsing $substring $substring3")
 
+                        if(substring.contains("(")) {
                             parseSubexpression(substring3)
                         }
                     } else {
-                        println("parsing $substring")
-
                         parseSubexpression(substring)
                     }
                 }
@@ -251,8 +216,6 @@ fun main() {
                     } else {
                         phantoms.add(Phantom(className, Types.Class))
 
-                        println("> creating ${entry.key} $className $string ${subexpression.name}")
-
                         className
                     }
 
@@ -261,8 +224,6 @@ fun main() {
                         val type : Types
                         val typeClass : String
                         val valueType = if(j == calls.size - 2 && i == subexpressions.size - 1) requiredRootType else null
-
-                        println("< $call $valueType $requiredRootType $j $i ${calls.size - 2} ${subexpressions.size - 1}")
 
                         if(call.contains("SUBEXPRESSION")) {
                             if(valueType != null) {
@@ -300,9 +261,7 @@ fun main() {
                                         typeClass = valueType
                                     }
 
-                                    println("adding 1 $call $typeClass")
-
-                                    phantoms.add(Phantom(call, Types.Field, "L$owner;", typeClass/*valueType ?: "LFieldTypeClass$fieldTypeCounter;"*/, shouldBeStatic))
+                                    phantoms.add(Phantom(call, Types.Field, "L$owner;", typeClass, shouldBeStatic))
                                 }
                             } else {
                                 if(valueType == null) {
@@ -313,9 +272,7 @@ fun main() {
                                     typeClass = valueType
                                 }
 
-                                println("adding 2 $call $typeClass")
-
-                                phantoms.add(Phantom(call, Types.Field, "L$owner;", typeClass/*valueType ?: "LFieldTypeClass$fieldTypeCounter;"*/, shouldBeStatic))
+                                phantoms.add(Phantom(call, Types.Field, "L$owner;", typeClass, shouldBeStatic))
                             }
                         }
 
@@ -323,8 +280,6 @@ fun main() {
                             phantoms.add(Phantom(typeClass.removePrefix("L").removeSuffix(";"), Types.Class))
 
                             createdTypeClasses.add(typeClass)
-
-                            println("creating $call $typeClass $valueType 1")
                         }
 
                         owner = valueType ?: typeClass
@@ -355,7 +310,6 @@ fun main() {
             if(!line1.contains("}")) {
                 val line2 = if(line1.startsWith("if")) {
                     requiredRootType = "Z"
-                    println("meow")
                     line1.removePrefix("if(").removeSuffix("){")
                 } else {
                     line1
@@ -373,17 +327,7 @@ fun main() {
                     val fieldPhantom = phantoms.last { it.type == Types.Field && it.name == fieldName }
                     val fieldType = fieldPhantom.descriptor!!
 
-                    /*val valueType = if(lastPhantom.type == Types.Method) {
-                        lastPhantom.descriptor!!.split(")")[1]
-                    } else {
-                        lastPhantom.descriptor
-                    }*/
-
-                    println(">>> $fieldType ${expressions[1]} ${fieldPhantom.name}")
-
                     requiredRootType = fieldType
-
-                    println("<<< $requiredRootType")
 
                     parseExpression(expressions[1])
                 } else {
@@ -423,14 +367,6 @@ fun main() {
                     null,
                     emptyArray()
                 )
-
-                /*classNode.visitMethod(
-                    Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC,
-                    "<cinit>",
-                    "()V",
-                    null,
-                    emptyArray()
-                )*/
 
                 classNodes["L${className.removePrefix("L").removeSuffix(";")};"] = classNode
             }
