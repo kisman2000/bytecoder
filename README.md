@@ -23,7 +23,7 @@ Originally made for `LavaHack`
 
 # We are
 
-Interpreting `if` statements
+Interpreting only `if` statements without `else` blocks
 
 Interpreting `=`/`+=`/`-=`/`*=`/`/=` operators
 
@@ -31,9 +31,9 @@ Interpreting `+`/`-`/`*`/`/`/`&`/`|` operators(`WIP`, may not work)
 
 Interpreting class/field/method calls
 
-# Future of java interpretation
+# Future of java interpreter
 
-Support of `for`/`do-while` statements
+Support of `for`/`do-while`/`if-else`/`if-else-if` statements
 
 Stable support of `+`/`-`/`*`/`/`/`&`/`|` operators
 
